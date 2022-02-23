@@ -174,6 +174,8 @@ public class JSONObject {
      */
     public static final Object NULL = new Null();
 
+    public static boolean writeSingleLine = true;
+
     /**
      * Construct an empty JSONObject.
      */
@@ -2611,7 +2613,7 @@ public class JSONObject {
             final int length = this.length();
             writer.write('{');
 
-            if (length == 1) {
+            if (JSONObject.writeSingleLine && length == 1) {
             	final Entry<String,?> entry = this.entrySet().iterator().next();
                 final String key = entry.getKey();
                 writer.write(quote(key));

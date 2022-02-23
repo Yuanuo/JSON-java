@@ -1520,7 +1520,7 @@ public class JSONArray implements Iterable<Object> {
             int length = this.length();
             writer.write('[');
 
-            if (length == 1) {
+            if (JSONObject.writeSingleLine && length == 1) {
                 try {
                     JSONObject.writeValue(writer, this.myArrayList.get(0),
                             indentFactor, indent);
