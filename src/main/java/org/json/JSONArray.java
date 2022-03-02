@@ -35,6 +35,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Predicate;
 
 
 /**
@@ -247,6 +249,20 @@ public class JSONArray implements Iterable<Object> {
     @Override
     public Iterator<Object> iterator() {
         return this.myArrayList.iterator();
+    }
+
+    public boolean has(Object value) {
+        for (int i = 0; i < this.myArrayList.size(); i++) {
+            if (Objects.equals(value, this.opt(i))) return true;
+        }
+        return false;
+    }
+
+    public boolean has(Predicate<Object> predicate) {
+        for (int i = 0; i < this.myArrayList.size(); i++) {
+            if (predicate.test(this.opt(i))) return true;
+        }
+        return false;
     }
 
     /**
