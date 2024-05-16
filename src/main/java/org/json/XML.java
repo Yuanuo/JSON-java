@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Iterator;
 
-
 /**
  * This provides static methods to convert an XML text into a JSONObject, and to
  * covert a JSONObject into an XML text.
@@ -20,6 +19,12 @@ import java.util.Iterator;
  */
 @SuppressWarnings("boxing")
 public class XML {
+
+    /**
+     * Constructs a new XML object.
+     */
+    public XML() {
+    }
 
     /** The Character '&amp;'. */
     public static final Character AMP = '&';
@@ -53,6 +58,9 @@ public class XML {
      */
     public static final String NULL_ATTR = "xsi:nil";
 
+    /**
+     * Represents the XML attribute name for specifying type information.
+     */
     public static final String TYPE_ATTR = "xsi:type";
 
     /**
@@ -428,6 +436,9 @@ public class XML {
                                             && jsonObject.opt(config.getcDataTagName()) != null) {
                                         context.accumulate(tagName, jsonObject.opt(config.getcDataTagName()));
                                     } else {
+                                        if (!config.shouldTrimWhiteSpace()) {
+                                            removeEmpty(jsonObject, config);
+                                        }
                                         context.accumulate(tagName, jsonObject);
                                     }
                                 }
@@ -442,58 +453,46 @@ public class XML {
             }
         }
     }
-
     /**
-     * This method tries to convert the given string value to the target object
-     * @param string String to convert
-     * @param typeConverter value converter to convert string to integer, boolean e.t.c
-     * @return JSON value of this string or the string
+     * This method removes any JSON entry which has the key set by XMLParserConfiguration.cDataTagName
+     * and contains whitespace as this is caused by whitespace between tags. See test XMLTest.testNestedWithWhitespaceTrimmingDisabled.
+     * @param jsonObject JSONObject which may require deletion
+     * @param config The XMLParserConfiguration which includes the cDataTagName
      */
-    public static Object stringToValue(String string, XMLXsiTypeConverter<?> typeConverter) {
-        if(typeConverter != null) {
-            return typeConverter.convert(string);
-        }
-        return stringToValue(string);
-    }
-
-    /**
-     * This method is the same as {@link JSONObject#stringToValue(String)}.
-     *
-     * @param string String to convert
-     * @return JSON value of this string or the string
-     */
-    // To maintain compatibility with the Android API, this method is a direct copy of
-    // the one in JSONObject. Changes made here should be reflected there.
-    // This method should not make calls out of the XML object.
-    public static Object stringToValue(String string) {
-        if ("".equals(string)) {
-            return string;
-        }
-
-        // check JSON key words true/false/null
-        if ("true".equalsIgnoreCase(string)) {
-            return Boolean.TRUE;
-        }
-        if ("false".equalsIgnoreCase(string)) {
-            return Boolean.FALSE;
-        }
-        if ("null".equalsIgnoreCase(string)) {
-            return JSONObject.NULL;
-        }
-
-        /*
-         * If it might be a number, try converting it. If a number cannot be
-         * produced, then the value will just be a string.
-         */
-
-        char initial = string.charAt(0);
-        if ((initial >= '0' && initial <= '9') || initial == '-') {
-            try {
-                return stringToNumber(string);
-            } catch (Exception ignore) {
+    private static void removeEmpty(final JSONObject jsonObject, final XMLParserConfiguration config) {
+        if (jsonObject.has(config.getcDataTagName()))  {
+            final Object s = jsonObject.get(config.getcDataTagName());
+            if (s instanceof String) {
+                if (isStringAllWhiteSpace(s.toString())) {
+                    jsonObject.remove(config.getcDataTagName());
+                }
+            }
+            else if (s instanceof JSONArray) {
+                final JSONArray sArray = (JSONArray) s;
+                for (int k = sArray.length()-1; k >= 0; k--){
+                    final Object eachString = sArray.get(k);
+                    if (eachString instanceof String) {
+                        String s1 = (String) eachString;
+                        if (isStringAllWhiteSpace(s1)) {
+                            sArray.remove(k);
+                        }
+                    }
+                }
+                if (sArray.isEmpty()) {
+                    jsonObject.remove(config.getcDataTagName());
+                }
             }
         }
-        return string;
+    }
+
+    private static boolean isStringAllWhiteSpace(final String s) {
+        for (int k = 0; k<s.length(); k++){
+            final char eachChar = s.charAt(k);
+            if (!Character.isWhitespace(eachChar)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -567,6 +566,58 @@ public class XML {
                 || val.indexOf('E') > -1 || "-0".equals(val);
     }
 
+    /**
+     * This method tries to convert the given string value to the target object
+     * @param string String to convert
+     * @param typeConverter value converter to convert string to integer, boolean e.t.c
+     * @return JSON value of this string or the string
+     */
+    public static Object stringToValue(String string, XMLXsiTypeConverter<?> typeConverter) {
+        if(typeConverter != null) {
+            return typeConverter.convert(string);
+        }
+        return stringToValue(string);
+    }
+
+    /**
+     * This method is the same as {@link JSONObject#stringToValue(String)}.
+     *
+     * @param string String to convert
+     * @return JSON value of this string or the string
+     */
+    // To maintain compatibility with the Android API, this method is a direct copy of
+    // the one in JSONObject. Changes made here should be reflected there.
+    // This method should not make calls out of the XML object.
+    public static Object stringToValue(String string) {
+        if ("".equals(string)) {
+            return string;
+        }
+
+        // check JSON key words true/false/null
+        if ("true".equalsIgnoreCase(string)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equalsIgnoreCase(string)) {
+            return Boolean.FALSE;
+        }
+        if ("null".equalsIgnoreCase(string)) {
+            return JSONObject.NULL;
+        }
+
+        /*
+         * If it might be a number, try converting it. If a number cannot be
+         * produced, then the value will just be a string.
+         */
+
+        char initial = string.charAt(0);
+        if ((initial >= '0' && initial <= '9') || initial == '-') {
+            try {
+                return stringToNumber(string);
+            } catch (Exception ignore) {
+            }
+        }
+        return string;
+    }
 
     /**
      * Convert a well-formed (but not necessarily valid) XML string into a
@@ -659,7 +710,7 @@ public class XML {
      */
     public static JSONObject toJSONObject(Reader reader, XMLParserConfiguration config) throws JSONException {
         JSONObject jo = new JSONObject();
-        XMLTokener x = new XMLTokener(reader);
+        XMLTokener x = new XMLTokener(reader, config);
         while (x.more()) {
             x.skipPast("<");
             if(x.more()) {
@@ -850,12 +901,25 @@ public class XML {
                         }
                     }
                 } else if ("".equals(value)) {
-                    sb.append(indent(indent));
-                    sb.append('<');
-                    sb.append(key);
-                    sb.append("/>");
-                    if(indentFactor > 0){
-                        sb.append("\n");
+                    if (config.isCloseEmptyTag()){
+                        sb.append(indent(indent));
+                        sb.append('<');
+                        sb.append(key);
+                        sb.append(">");
+                        sb.append("</");
+                        sb.append(key);
+                        sb.append(">");
+                        if (indentFactor > 0) {
+                            sb.append("\n");
+                        }
+                    }else {
+                        sb.append(indent(indent));
+                        sb.append('<');
+                        sb.append(key);
+                        sb.append("/>");
+                        if (indentFactor > 0) {
+                            sb.append("\n");
+                        }
                     }
 
                     // Emit a new tag <k>
@@ -899,14 +963,14 @@ public class XML {
 
 
         string = (object == null) ? "null" : escape(object.toString());
-
+        String indentationSuffix = (indentFactor > 0) ? "\n" : "";
         if(tagName == null){
-            return indent(indent) + "\"" + string + "\"" + ((indentFactor > 0) ? "\n" : "");
+            return indent(indent) + "\"" + string + "\"" + indentationSuffix;
         } else if(string.length() == 0){
-            return indent(indent) + "<" + tagName + "/>" + ((indentFactor > 0) ? "\n" : "");
+            return indent(indent) + "<" + tagName + "/>" + indentationSuffix;
         } else {
             return indent(indent) + "<" + tagName
-                    + ">" + string + "</" + tagName + ">" + ((indentFactor > 0) ? "\n" : "");
+                    + ">" + string + "</" + tagName + ">" + indentationSuffix;
         }
     }
 
